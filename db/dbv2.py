@@ -19,12 +19,16 @@ class DB:
     def __init__(self, dataset_type, table_type=""):
         self.dataset_type = dataset_type
         self.table_type = table_type
-        self.table_name = "qmsum_"+dataset_type
+        self.table_name = "wikisection_"+dataset_type
 
         if table_type == "augmented":
             self.table_name += "_gpt_augmented"
         elif table_type == "train_test":
             self.table_name += "_train_test"
+        elif table_type == "test":
+            self.table_name += "_test"
+        elif table_type == "validation":
+            self.table_name += "_validation"
         elif table_type == "gta1":
             self.table_name += "_gta1"
         elif table_type == "gta2":
@@ -139,7 +143,7 @@ class DB:
         return rows
 
     def get_target_sentence_ids(self, split="test"):
-        train_test_table_name = "qmsum_"+self.dataset_type+"_train_test"
+        train_test_table_name = "wikisection_"+self.dataset_type+"_train_test"
         sql = f"""SELECT * FROM {train_test_table_name} WHERE type=? ORDER BY RANDOM()"""
 
         cur = self.conn.cursor()
@@ -365,6 +369,42 @@ class GTA2Table(DB):
 
         return rows
 
+class TestTable(DB):
+    def __init__(self, dataset_type, table_type=""):
+        super().__init__(dataset_type, 'test')
+
+    def migrate_table(self):
+
+        sql_create_test_table = f""" CREATE TABLE IF NOT EXISTS {self.table_name} (
+                                id integer PRIMARY KEY,
+                                sentence text NOT NULL,
+                                target integer NOT NULL,
+                                parent integer,
+                                sequence integer NOT NULL
+                            ); """
+
+        # create tables
+        if self.conn is not None:
+            self.create_table(sql_create_test_table)
+
+
+class ValidationTable(DB):
+    def __init__(self, dataset_type, table_type=""):
+        super().__init__(dataset_type, 'validation')
+
+    def migrate_table(self):
+
+        sql_create_validation_table = f""" CREATE TABLE IF NOT EXISTS {self.table_name} (
+                                id integer PRIMARY KEY,
+                                sentence text NOT NULL,
+                                target integer NOT NULL,
+                                parent integer,
+                                sequence integer NOT NULL
+                            ); """
+
+        # create tables
+        if self.conn is not None:
+            self.create_table(sql_create_validation_table)
 
 class TrainTestTable(DB):
     def __init__(self, dataset_type):

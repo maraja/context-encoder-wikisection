@@ -144,12 +144,16 @@ dmypy.json
 # End of https://www.toptal.com/developers/gitignore/api/python
 
 raw_data/WikiSection/*
+raw_data/city/*
+raw_data/disease/*
 models/*
 data/*
 logs/*
 !raw_data/WikiSection/.gitkeep
+!raw_data/disease/.gitkeep
+!raw_data/city/.gitkeep
 !data/.gitkeep
 !models/.gitkeep
 !logs/.gitkeep
 weights_*
-# db/*.db
+db/*.db

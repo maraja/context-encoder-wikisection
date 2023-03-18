@@ -16,11 +16,12 @@ class RawData:
 
     def get_data(self, split="train"):
         self.split = split
-        data_path = f"{config.root_path}/raw_data/{self.dataset_type}/jsonl/{split}.jsonl"
-        data = []
+        data_path = f"{config.root_path}/raw_data/{self.dataset_type}/wikisection_en_{self.dataset_type}_{split}.json"
+        data = None
         with open(data_path) as f:
-            for line in f:
-                data.append(json.loads(line))
+            data = json.load(f)
+
+        assert data is not None, "data couldnot be imported"
 
         return data
 

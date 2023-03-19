@@ -1,6 +1,10 @@
 from dataclasses import dataclass
 from typing import List
 from nltk.tokenize import word_tokenize
+from sklearn.feature_extraction.text import CountVectorizer
+
+count_vectorizer = CountVectorizer()
+count_tokenizer = count_vectorizer.build_tokenizer()
 
 
 @dataclass
@@ -31,8 +35,9 @@ def flatten(arr):
 def truncate_by_char(text, num_chars):
     return text[:num_chars]
 
+
 def truncate_by_token(text, num_tokens):
-    return " ".join(word_tokenize(text)[:num_tokens])
+    return " ".join(count_tokenizer(text)[:num_tokens])
 
 
 def truncate_by_sentence(text, num_sentences):

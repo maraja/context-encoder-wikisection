@@ -1,5 +1,10 @@
 from nltk import word_tokenize
 
+from sklearn.feature_extraction.text import CountVectorizer
+
+count_vectorizer = CountVectorizer()
+count_tokenizer = count_vectorizer.build_tokenizer()
+
 # tokneize a sent
 
 

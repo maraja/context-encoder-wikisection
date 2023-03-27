@@ -3,7 +3,9 @@ from src.bertkeywords.src.similarities import Embedding, Similarities
 from src.bertkeywords.src.keywords import Keywords
 
 class Coherence:
-    def __init__(self):
+    def __init__(self, max_words_per_step=2, coherence_threshold=0.4):
+        self.max_words_per_step = max_words_per_step
+        self.coherence_threshold = coherence_threshold
         self.keywords_lib = Keywords()
 
         similarities_lib = Similarities("bert-base-uncased")
@@ -32,34 +34,42 @@ class Coherence:
 
         return coherent_words
 
-    def build_coherence_map(
+    def get_coherence(
         self,
-        segments: list[list[str]], 
-        max_words_per_step=2, 
-        coherence_threshold=0.4
+        segment: list[str]
     ):
         """creates a list of words that are common and strong in a segment.
 
         Args:
-            segments (list[list[str]]): text segments to get keywords and collect similar ones on
-            max_words_per_step (int, optional): every step (every 2 sentences), how many common words to collect. Defaults to 2.
-            coherence_threshold (float, optional): threshold for similarity between two words that are the same. Defaults to 0.4.
-
+            segments (list[str]): a segment of sentences to get keywords and collect similar ones on
+            
         Returns:
             list: list of words that are considered high coherence in the segment
         """
-        coherence_map = []
-        prev_segment = None
-        for segment in segments:
-            if prev_segment is None:
-                prev_segment = segment
+        coherence = []
+        prev_sentence = None
+        for sentence in segment:
+            if prev_sentence is None:
+                prev_sentence = sentence
                 continue
             else:
-                coherence_map.extend(
-                    self.get_coherent_words(prev_segment, segment, coherence_threshold)[
-                        :max_words_per_step
+                coherence.extend(
+                    self.get_coherent_words(prev_sentence, sentence, self.coherence_threshold)[
+                        :self.max_words_per_step
                     ]
                 )
-                prev_segment = segment
+                prev_sentence = sentence
+
+        return coherence
+
+    def get_coherence_map(
+        self,
+        segments: list[list[str]],
+    ):
+        coherence_map = []
+        for segment in segments:
+            coherence_map.append(
+                self.get_coherence(segment)
+            )
 
         return coherence_map

@@ -54,3 +54,7 @@ def avg_segment_length_by_char(segment, floor=True):
 
 def avg_segment_length_by_token(segment, floor=True):
     return sum([len(word_tokenize(t)) for t in segment]) // float(len(segment)) if floor == True else sum([len(word_tokenize(t)) for t in segment]) / float(len(segment))
+
+
+def dedupe_list(arr):
+    return list(set(arr))

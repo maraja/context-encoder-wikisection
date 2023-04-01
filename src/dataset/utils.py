@@ -58,3 +58,9 @@ def avg_segment_length_by_token(segment, floor=True):
 
 def dedupe_list(arr):
     return list(set(arr))
+
+def truncate_string(text, max_chars=30):
+    truncated_string = (
+            (text[:max_chars] + "..") if len(text) > max_chars else text
+        )
+    return truncated_string

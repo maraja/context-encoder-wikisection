@@ -8,9 +8,9 @@ class Coherence:
     def __init__(self, max_words_per_step=2, coherence_threshold=0.4):
         self.max_words_per_step = max_words_per_step
         self.coherence_threshold = coherence_threshold
-        self.keywords_lib = Keywords()
-
         similarities_lib = Similarities("bert-base-uncased")
+
+        self.keywords_lib = Keywords(similarities_lib.model, similarities_lib.tokenizer)
         self.embedding_lib = Embedding(
             similarities_lib.model, similarities_lib.tokenizer)
 
@@ -35,7 +35,9 @@ class Coherence:
                     )
 
                     if similarity[0] >= coherence_threshold:
-                        coherent_words.append(word1_text)
+                        # append the tuple with the embedding for each word that's similar
+                        coherent_words.append((word1[0], word1[1], emb1))
+                        coherent_words.append((word2[0], word2[1], emb2))
 
         return coherent_words
 

@@ -1,7 +1,7 @@
 import torch
 from src.bertkeywords.src.similarities import Embedding, Similarities
 from src.bertkeywords.src.keywords import Keywords
-from src.dataset.utils import dedupe_list
+from src.dataset.utils import dedupe_list, flatten, truncate_string, truncate_by_token
 
 
 class Coherence:
@@ -72,13 +72,13 @@ class Coherence:
     def get_coherence(
         self,
         segment,
-        word_sim: float = 1
+        coherence_threshold: float = 1
     ):
         """creates a list of words that are common and strong in a segment.
 
         Args:
             segments (list[str]): a segment of sentences to get keywords and collect similar ones on
-            word_sim (float): If this number is anything less than one, look for similar words higher than the provided value. Otherwise look for only identical words
+            coherence_threshold (float): If this number is anything less than one, look for similar words higher than the provided value. Otherwise look for only identical words
 
         Returns:
             list: list of words that are considered high coherence in the segment
@@ -90,12 +90,12 @@ class Coherence:
                 prev_sentence = sentence
                 continue
             else:
-                if (word_sim == 1):
+                if (coherence_threshold == 1):
                     coherent_words = self.get_identical_coherent_words(prev_sentence, sentence, self.coherence_threshold)[
                         :self.max_words_per_step
                     ]
                 else:
-                    coherent_words = self.get_similar_coherent_words(prev_sentence, sentence, word_sim)[
+                    coherent_words = self.get_similar_coherent_words(prev_sentence, sentence, coherence_threshold)[
                         :self.max_words_per_step
                     ]
                 coherence.extend(coherent_words)
@@ -114,3 +114,59 @@ class Coherence:
             )
 
         return coherence_map
+
+    def predict(self, text_data, text_labels, max_tokens=256, prediction_thresh=0.3, pruning=4, pruning_min=10):
+        # pruning = 4  # remove the lowest n important words from coherence map
+        # pruning_min = 10  # only prune after n words in the coherence map
+        coherence_map = []
+        predictions = []
+        for i, (row, label) in enumerate(zip(text_data, text_labels)):
+            # compare the current sentence to the previous one
+            if i == 0:
+                predictions.append((0,1)) # predict a 1 since it's the start
+                pass
+            else:
+                prev_row = text_data[i - 1]
+
+                row = truncate_by_token(row, max_tokens)
+                prev_row = truncate_by_token(prev_row, max_tokens)
+
+                # add the keywords to the coherence map
+                coherence_map.extend(self.get_coherence([row, prev_row], word_sim=self.coherence_threshold))
+                if pruning > 0 and len(coherence_map) >= pruning_min:
+                    sorted_map = sorted(
+                        coherence_map, key=lambda tup: tup[1]
+                    )  # sort asc by importance based on keybert
+                    coherence_map = sorted_map[pruning:][
+                        ::-1
+                    ]  # get the last n - pruning values and reverse the list
+
+                # get the keywords for the current sentences
+                keywords_current = self.keywords_lib.get_keywords_with_embeddings(row)
+                keywords_prev = self.keywords_lib.get_keywords_with_embeddings(prev_row)
+
+                # compute the word comparisons between the previous (with the coherence map)
+                # and the current (possibly the first sentence in a new segment)
+                word_comparisons_with_coherence = self.embedding_lib.compare_keyword_tuples(
+                    [*coherence_map, *keywords_prev], keywords_current
+                )
+
+                similarities_with_coherence = [
+                    comparison[2] for comparison in word_comparisons_with_coherence
+                ]
+                avg_similarity_with_coherence = sum(similarities_with_coherence) / len(
+                    similarities_with_coherence
+                )
+
+                # if the two sentences are similar, create a cohesive prediction
+                # otherwise, predict a new segment
+                if avg_similarity_with_coherence[0] > prediction_thresh:
+                    # print(f"Label: {label}, Prediction: {0}")
+                    predictions.append((avg_similarity_with_coherence[0], 0))
+                else:
+                    # start of a new segment, empty the map
+                    coherence_map = []
+                    # print(f"Label: {label}, Prediction: {1}")
+                    predictions.append((avg_similarity_with_coherence[0], 1))
+
+        return predictions

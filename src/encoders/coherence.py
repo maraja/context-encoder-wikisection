@@ -2,12 +2,13 @@ import torch
 from src.bertkeywords.src.similarities import Embedding, Similarities
 from src.bertkeywords.src.keywords import Keywords
 from src.dataset.utils import dedupe_list, flatten, truncate_string, truncate_by_token
-
+import time
 
 class Coherence:
     def __init__(self, max_words_per_step=2, coherence_threshold=0.4):
         self.max_words_per_step = max_words_per_step
         self.coherence_threshold = coherence_threshold
+        # similarities_lib = Similarities("sentence-transformers/LaBSE")
         similarities_lib = Similarities("bert-base-uncased")
 
         self.keywords_lib = Keywords(similarities_lib.model, similarities_lib.tokenizer)
@@ -15,20 +16,41 @@ class Coherence:
             similarities_lib.model, similarities_lib.tokenizer
         )
 
-    def get_identical_coherent_words(self, sentence1, sentence2, coherence_threshold):
-        kw_sentence2 = self.keywords_lib.get_keywords(sentence2)
-        kw_sentence1 = self.keywords_lib.get_keywords(sentence1)
+    def get_similar_coherent_words(self, prev_sentence, curr_sentence, coherence_threshold):
+        tic = time.perf_counter()
+        kw_curr_sentence = self.keywords_lib.get_keywords_with_kb_embeddings(curr_sentence)[:self.max_words_per_step*2]
+        kw_prev_sentence = self.keywords_lib.get_keywords_with_kb_embeddings(prev_sentence)[:self.max_words_per_step*2]
+        print([x[0] for x in kw_curr_sentence])
+        print([x[0] for x in kw_prev_sentence])
+        toc = time.perf_counter()
+        print(f"Got the keywords in {toc - tic:0.4f} seconds")
 
         coherent_words = []
 
-        for word2 in kw_sentence2:
-            for word1 in kw_sentence1:
-                word1_text = word1[0]
-                word2_text = word2[0]
-                if word1_text == word2_text:
+        tic = time.perf_counter()
+        for word2 in kw_curr_sentence:
+            for word1 in kw_prev_sentence:
+
+                # check to see if either word by its embedding already exists in the
+                # coherent words so far.
+                skip_comparison = False
+                coherent_word_embeddings_only = [w[2] for w in coherent_words]
+                for we in coherent_word_embeddings_only:
+                    if torch.equal(we, word1[2]) or torch.equal(we, word2[2]):
+                        # the word has already been added
+                        skip_comparison = True
+                        continue
+
+                # don't consider all numbers because in a pre-trained LLM
+                # they have no use or meaning.
+                if word1[0].isnumeric() or word2[0].isnumeric():
+                    skip_comparison = True
+                    continue
+
+                if not skip_comparison:
                     # check similarity and add to coherent dictionary
-                    emb1 = self.embedding_lib.get_word_embedding(sentence1, word1_text)
-                    emb2 = self.embedding_lib.get_word_embedding(sentence2, word2_text)
+                    emb1 = word1[2]
+                    emb2 = word2[2]
                     similarity = torch.cosine_similarity(
                         emb1.reshape(1, -1), emb2.reshape(1, -1)
                     )
@@ -38,32 +60,15 @@ class Coherence:
                         coherent_words.append((word1[0], word1[1], emb1))
                         coherent_words.append((word2[0], word2[1], emb2))
 
-        return coherent_words
+        toc = time.perf_counter()
+        print(f"Got the embeddings and comparisons in {toc - tic:0.4f} seconds")
 
-    def get_similar_coherent_words(self, sentence1, sentence2, coherence_threshold):
-        kw_sentence2 = self.keywords_lib.get_keywords(sentence2)
-        kw_sentence1 = self.keywords_lib.get_keywords(sentence1)
-
-        coherent_words = []
-
-        for word2 in kw_sentence2:
-            for word1 in kw_sentence1:
-                word1_text = word1[0]
-                word2_text = word2[0]
-
-                # check similarity and add to coherent dictionary
-                emb1 = self.embedding_lib.get_word_embedding(sentence1, word1_text)
-                emb2 = self.embedding_lib.get_word_embedding(sentence2, word2_text)
-                similarity = torch.cosine_similarity(
-                    emb1.reshape(1, -1), emb2.reshape(1, -1)
-                )
-
-                if similarity[0] >= coherence_threshold:
-                    # append the tuple with the embedding for each word that's similar
-                    coherent_words.append((word1[0], word1[1], emb1))
-                    coherent_words.append((word2[0], word2[1], emb2))
-
-        return coherent_words
+        # # sort by descending to have the most important words first
+        # desc_sorted_words = sorted(
+        #     coherent_words, 
+        #     key=lambda x: x[1]
+        # )[::-1]
+        return coherent_words, kw_prev_sentence, kw_curr_sentence
 
     def get_coherence(self, segment, coherence_threshold: float = 1):
         """creates a list of words that are common and strong in a segment.
@@ -75,25 +80,20 @@ class Coherence:
         Returns:
             list: list of words that are considered high coherence in the segment
         """
-        coherence = []
+        cohesion = []
         prev_sentence = None
         for sentence in segment:
             if prev_sentence is None:
                 prev_sentence = sentence
                 continue
             else:
-                if coherence_threshold == 1:
-                    coherent_words = self.get_identical_coherent_words(
-                        prev_sentence, sentence, self.coherence_threshold
-                    )[: self.max_words_per_step]
-                else:
-                    coherent_words = self.get_similar_coherent_words(
-                        prev_sentence, sentence, coherence_threshold
-                    )[: self.max_words_per_step]
-                coherence.extend(coherent_words)
+                coherent_words, kw_prev_sentence, kw_curr_sentence = self.get_similar_coherent_words(
+                    prev_sentence, sentence, coherence_threshold
+                )[: self.max_words_per_step]
+                cohesion.extend(coherent_words)
                 prev_sentence = sentence
 
-        return coherence
+        return cohesion[:self.max_words_per_step], kw_prev_sentence, kw_curr_sentence
 
     def get_coherence_map(
         self,

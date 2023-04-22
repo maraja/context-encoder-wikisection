@@ -10,8 +10,9 @@ class Coherence:
         self.max_words_per_step = max_words_per_step
         self.coherence_threshold = coherence_threshold
         # similarities_lib = Similarities("sentence-transformers/LaBSE")
-        similarities_lib = Similarities("bert-base-uncased")
-        # similarities_lib = Similarities("all-MiniLM-L12-v2")
+        # similarities_lib = Similarities("bert-base-uncased")
+        similarities_lib = Similarities("roberta-base")
+        # similarities_lib = Similarities("sentence-transformers/all-MiniLM-L6-v2")
         # similarities_lib = Similarities("Dimitre/universal-sentence-encoder")
 
         self.keywords_lib = Keywords(similarities_lib.model, similarities_lib.tokenizer)
@@ -23,14 +24,14 @@ class Coherence:
         self, prev_sentence, curr_sentence, coherence_threshold
     ):
         tic = time.perf_counter()
-        kw_curr_sentence = self.keywords_lib.get_keywords_with_kb_embeddings(
+        kw_curr_sentence = self.keywords_lib.get_keywords_with_embeddings(
             curr_sentence
         )[: self.max_words_per_step]
-        kw_prev_sentence = self.keywords_lib.get_keywords_with_kb_embeddings(
+        kw_prev_sentence = self.keywords_lib.get_keywords_with_embeddings(
             prev_sentence
         )[: self.max_words_per_step]
-        print([x[0] for x in kw_curr_sentence])
-        print([x[0] for x in kw_prev_sentence])
+        print([x[0] for x in kw_curr_sentence], curr_sentence)
+        print([x[0] for x in kw_prev_sentence], prev_sentence)
         toc = time.perf_counter()
         print(f"Got the keywords in {toc - tic:0.4f} seconds")
 

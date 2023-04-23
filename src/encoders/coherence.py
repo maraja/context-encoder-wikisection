@@ -10,8 +10,8 @@ class Coherence:
         self.max_words_per_step = max_words_per_step
         self.coherence_threshold = coherence_threshold
         # similarities_lib = Similarities("sentence-transformers/LaBSE")
-        # similarities_lib = Similarities("bert-base-uncased")
-        similarities_lib = Similarities("roberta-base")
+        similarities_lib = Similarities("bert-base-uncased")
+        # similarities_lib = Similarities("roberta-base")
         # similarities_lib = Similarities("sentence-transformers/all-MiniLM-L6-v2")
         # similarities_lib = Similarities("Dimitre/universal-sentence-encoder")
 
